@@ -1,0 +1,5 @@
+# Core: data prep, evaluation, inference clients, tests (no GPU needed)
+pydantic>=2.6
+openai>=1.40      # client for vLLM's OpenAI-compatible server
+anthropic>=1.15   # prompted frontier baseline
+pytest>=8

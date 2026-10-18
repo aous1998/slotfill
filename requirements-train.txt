@@ -1,0 +1,4 @@
+# Training (GPU). `pip install unsloth` pulls compatible torch/transformers/peft/trl/bitsandbytes.
+unsloth
+# For --backend peft without Unsloth, instead install:
+# torch transformers>=4.46 peft>=0.13 bitsandbytes>=0.44 accelerate

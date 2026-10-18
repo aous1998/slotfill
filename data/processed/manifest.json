@@ -1,0 +1,17 @@
+{
+  "source": "https://github.com/zzzDavid/ICDAR-2019-SROIE.git",
+  "source_commit": "27be4271b251c256f695acbade9a801bffe85994",
+  "labelled_docs": 626,
+  "kept_docs": 624,
+  "dropped": {
+    "unreadable_total": 2
+  },
+  "split": "vendor-disjoint",
+  "seed": 42,
+  "max_vendor_docs_in_test": 12,
+  "train_docs": 424,
+  "test_docs": 200,
+  "train_vendors": 108,
+  "test_vendors": 124,
+  "test_sha256": "334637fc534a0f96305a87c38911f2fd6875538366914b52aea46ed3b410170c"
+}

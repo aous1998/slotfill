@@ -1,0 +1,22 @@
+{
+  "train": {
+    "total": 1.0,
+    "date": 0.9976,
+    "company": 0.9835,
+    "company_fuzzy": 0.9976,
+    "address": 0.9009,
+    "address_fuzzy": 0.9976,
+    "all_exact": 0.8844,
+    "n": 424
+  },
+  "test": {
+    "total": 1.0,
+    "date": 1.0,
+    "company": 0.96,
+    "company_fuzzy": 1.0,
+    "address": 0.85,
+    "address_fuzzy": 1.0,
+    "all_exact": 0.82,
+    "n": 200
+  }
+}

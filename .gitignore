@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+data/raw/
+adapters/*/
+!adapters/.gitkeep
+adapters/*/checkpoints/
+vllm.log
+*.zip
+.ipynb_checkpoints/

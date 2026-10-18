@@ -1,0 +1,2 @@
+# Serving (GPU). Install in a separate environment from training; vLLM pins its own torch.
+vllm>=0.6
