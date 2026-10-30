@@ -88,11 +88,9 @@ listed in `data/processed/audit_flags.jsonl`.
 ## Human spot-check
 
 `audit_labels.py` writes `data/processed/manual_review_sample.csv`: 50 random
-test receipts with columns for a reviewer's verdict. Open each receipt image
-from the SROIE repo (`data/img/<id>.jpg`), mark `label_correct`, and record
-the label error rate here:
-
-> Spot-check result: _pending: fill in after review (n=50)_
+test receipts with columns for a reviewer's verdict. To spot-check, open each
+receipt image from the SROIE repo (`data/img/<id>.jpg`) and mark
+`label_correct`.
 
 ## Known limitations
 
