@@ -4,6 +4,9 @@ Using the identical instruction everywhere means the comparison measures what
 fine-tuning adds, not differences in prompt wording.
 """
 
+# The system prompt: describes the task, the exact output format and a rule per field.
+# The fine-tuned adapters are trained with this same prompt, so at test time they see
+# exactly what they saw during training.
 SYSTEM_PROMPT = """You extract fields from the OCR text of a scanned receipt or invoice.
 
 Return ONLY a JSON object with exactly these keys, no markdown, no commentary:
@@ -18,14 +21,18 @@ Rules:
 
 
 def user_message(ocr_text: str) -> str:
+    # The user turn is just the OCR transcript with a short label in front.
     return f"OCR text:\n{ocr_text}"
 
 
 def build_messages(ocr_text: str, answer: str | None = None) -> list[dict]:
+    # Chat-format messages in the OpenAI/Hugging Face style: system, then user.
     msgs = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_message(ocr_text)},
     ]
+    # During training we also append the correct answer as the assistant turn;
+    # at inference time `answer` is None and the model writes that turn itself.
     if answer is not None:
         msgs.append({"role": "assistant", "content": answer})
     return msgs

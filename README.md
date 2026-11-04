@@ -55,6 +55,11 @@ Receipts (human labels)  →  clean + split  →  train LoRA adapter  →  serve
 Open the notebook in Colab (badge above), choose a **T4 GPU**, add your `ANTHROPIC_API_KEY` as a Colab secret, and run all cells.
 It trains, serves, runs the comparison and prints the results table.
 
+**Colab Pro with an A100, open-weight models only:** open
+[`notebooks/slotfill_colab_a100.ipynb`](https://colab.research.google.com/github/aous1998/slotfill/blob/colab-a100-open-weights/notebooks/slotfill_colab_a100.ipynb)
+and choose an **A100 GPU**. No API key is needed. It replaces the Claude baselines with
+Qwen2.5-32B-Instruct (AWQ), both prompted and with schema-constrained decoding through vLLM.
+
 Or locally:
 
 ```bash

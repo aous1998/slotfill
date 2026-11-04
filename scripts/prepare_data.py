@@ -23,20 +23,25 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+# Make the repo root importable so `from slotfill...` works when run as `python scripts/x.py`.
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from slotfill.data import PROCESSED, ROOT, write_jsonl  # noqa: E402
 from slotfill.normalize import normalize_date, normalize_text, normalize_total, text_key  # noqa: E402
 from slotfill.schema import Receipt  # noqa: E402
 
+# Public mirror of the ICDAR 2019 SROIE receipts dataset (MIT licence).
 SROIE_REPO = "https://github.com/zzzDavid/ICDAR-2019-SROIE.git"
 
 
 def fetch(raw_dir: Path) -> str:
+    # Download only what we need: a shallow, sparse clone with just the OCR boxes
+    # (data/box) and the human labels (data/key). Skipped if already downloaded.
     if not (raw_dir / "data" / "key").exists():
         raw_dir.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(["git", "clone", "--depth", "1", "--filter=blob:none", "--sparse", SROIE_REPO, str(raw_dir)], check=True)
         subprocess.run(["git", "-C", str(raw_dir), "sparse-checkout", "set", "data/box", "data/key"], check=True)
+    # Record the exact dataset commit in the manifest so the split can be reproduced.
     try:
         return subprocess.run(["git", "-C", str(raw_dir), "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -44,6 +49,7 @@ def fetch(raw_dir: Path) -> str:
 
 
 def read_text(path: Path) -> str:
+    # A few SROIE files aren't valid UTF-8; latin-1 can decode any byte, so it's a safe fallback.
     data = path.read_bytes()
     try:
         return data.decode("utf-8")
@@ -55,32 +61,41 @@ def read_ocr(path: Path) -> str:
     """Each line is x1,y1,...,x4,y4,transcript; the transcript itself may contain commas."""
     lines = []
     for line in read_text(path).splitlines():
+        # Split at most 8 times: the first 8 parts are box coordinates, the 9th is the text
+        # (kept whole even if it contains commas). The coordinates are thrown away.
         parts = line.split(",", 8)
         if len(parts) == 9 and parts[8].strip():
             lines.append(parts[8].strip())
+    # The model sees the receipt as plain text, one OCR line per line.
     return "\n".join(lines)
 
 
 def build_record(doc_id: str, raw: dict, ocr: str) -> tuple[dict | None, str | None]:
+    # Convert the human label to the canonical form (ISO date, 2-decimal total, clean text).
     gold = {
         "company": normalize_text(raw.get("company")),
         "date": normalize_date(raw.get("date", "")),
         "address": normalize_text(raw.get("address")),
         "total": normalize_total(raw.get("total", "")),
     }
+    # company, date and total are required. If a label can't be normalised, drop the doc
+    # and return the reason, so drops are counted in the manifest instead of hidden.
     for field in ("company", "date", "total"):
         if not gold[field]:
             return None, f"unreadable_{field}"
     if not ocr:
         return None, "empty_ocr"
     Receipt.model_validate(gold)  # gold must satisfy the same schema we grade against
+    # "vendor" is a normalised company name, used to keep each vendor on one side of the split.
     return {"id": doc_id, "vendor": text_key(gold["company"]), "ocr": ocr, "gold": gold, "raw_label": raw}, None
 
 
 def vendor_split(records: list[dict], test_size: int, seed: int, max_vendor_docs: int) -> tuple[list[dict], list[dict]]:
+    # Group receipts by vendor.
     by_vendor: dict[str, list[dict]] = {}
     for r in records:
         by_vendor.setdefault(r["vendor"], []).append(r)
+    # Shuffle vendors with a fixed seed (sorted first, so the result doesn't depend on dict order).
     vendors = sorted(by_vendor)
     random.Random(seed).shuffle(vendors)
     test_vendors: set[str] = set()
@@ -93,6 +108,7 @@ def vendor_split(records: list[dict], test_size: int, seed: int, max_vendor_docs
             n += size
         if n == test_size:
             break
+    # Every receipt from a test vendor goes to test; everything else goes to train.
     train = [r for r in records if r["vendor"] not in test_vendors]
     test = [r for r in records if r["vendor"] in test_vendors]
     return train, test
@@ -106,9 +122,11 @@ def main() -> None:
     ap.add_argument("--max-vendor-docs-in-test", type=int, default=12)
     args = ap.parse_args()
 
+    # 1. Download the raw dataset (or reuse an existing copy).
     commit = fetch(args.raw_dir)
     key_dir, box_dir = args.raw_dir / "data" / "key", args.raw_dir / "data" / "box"
 
+    # 2. Pair every label file (key/<id>.json) with its OCR file (box/<id>.csv).
     records, dropped = [], Counter()
     for key_path in sorted(key_dir.glob("*.json")):
         doc_id = key_path.stem
@@ -123,9 +141,11 @@ def main() -> None:
             continue
         records.append(rec)
 
+    # 3. Split by vendor, and check that no vendor ended up on both sides.
     train, test = vendor_split(records, args.test_size, args.seed, args.max_vendor_docs_in_test)
     assert not {r["vendor"] for r in train} & {r["vendor"] for r in test}, "vendor leakage"
 
+    # 4. Write the split plus a manifest describing exactly how it was made.
     write_jsonl(PROCESSED / "train.jsonl", train)
     write_jsonl(PROCESSED / "test.jsonl", test)
     manifest = {
@@ -141,6 +161,7 @@ def main() -> None:
         "test_docs": len(test),
         "train_vendors": len({r["vendor"] for r in train}),
         "test_vendors": len({r["vendor"] for r in test}),
+        # Fingerprint of the test file. The tests check it, so the test set can't change unnoticed.
         "test_sha256": hashlib.sha256((PROCESSED / "test.jsonl").read_bytes()).hexdigest(),
     }
     (PROCESSED / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
