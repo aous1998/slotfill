@@ -4,6 +4,10 @@ Self-hosted model behind vLLM (base model or a LoRA adapter, OpenAI-compatible A
     python scripts/predict.py --provider vllm --model slotfill-r16 \
         --gpu-hourly 0.40 --out results/preds_lora.jsonl
 
+Large open-weight baseline served by vLLM, with schema-constrained decoding:
+    python scripts/predict.py --provider vllm --model Qwen/Qwen2.5-32B-Instruct-AWQ \
+        --structured --gpu-hourly 1.30 --out results/preds_qwen32b_structured.jsonl
+
 Prompted frontier baseline (Claude, needs ANTHROPIC_API_KEY):
     python scripts/predict.py --provider anthropic --model claude-opus-5-5 \
         --out results/preds_claude.jsonl
@@ -45,6 +49,13 @@ class VLLMClient:
         self.client = AsyncOpenAI(base_url=args.base_url, api_key=args.api_key or "EMPTY")
         self.model = args.model
         self.max_tokens = args.max_tokens
+        self.extra: dict = {}
+        if args.structured:
+            # vLLM guided decoding: tokens outside the JSON schema are masked out.
+            self.extra["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {"name": "receipt", "schema": JSON_SCHEMA, "strict": True},
+            }
 
     async def __call__(self, ocr: str) -> dict:
         resp = await self.client.chat.completions.create(
@@ -52,6 +63,7 @@ class VLLMClient:
             messages=build_messages(ocr),
             temperature=0.0,
             max_tokens=self.max_tokens,
+            **self.extra,
         )
         return {
             "raw_output": resp.choices[0].message.content,
@@ -133,8 +145,8 @@ def main() -> None:
     ap.add_argument("--base-url", default="http://localhost:8000/v1")
     ap.add_argument("--api-key")
     ap.add_argument("--gpu-hourly", type=float, help="USD/hour of the GPU serving vLLM, for cost per 1k.")
+    ap.add_argument("--structured", action="store_true", help="Constrain decoding to the JSON schema (both providers).")
     # Anthropic
-    ap.add_argument("--structured", action="store_true", help="Constrain decoding to the JSON schema.")
     ap.add_argument("--effort", choices=["low", "medium", "high", "xhigh", "max"])
     args = ap.parse_args()
 

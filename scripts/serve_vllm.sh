@@ -11,6 +11,14 @@ set -euo pipefail
 BASE="${BASE:-Qwen/Qwen2.5-3B-Instruct}"
 PORT="${PORT:-8000}"
 MAX_LORA_RANK="${MAX_LORA_RANK:-64}"
+GPU_UTIL="${GPU_UTIL:-0.85}"
+
+# NO_LORA=1 serves a plain model (e.g. a large open-weight baseline) with no adapters.
+if [ "${NO_LORA:-0}" = "1" ]; then
+  echo "serving $BASE (no adapters)"
+  exec vllm serve "$BASE" --port "$PORT" --max-model-len 4096 \
+    --gpu-memory-utilization "$GPU_UTIL" --dtype auto
+fi
 
 modules=()
 for dir in adapters/*/; do
@@ -31,5 +39,5 @@ exec vllm serve "$BASE" \
   --max-lora-rank "$MAX_LORA_RANK" \
   --lora-modules "${modules[@]}" \
   --max-model-len 4096 \
-  --gpu-memory-utilization 0.85 \
+  --gpu-memory-utilization "$GPU_UTIL" \
   --dtype auto
